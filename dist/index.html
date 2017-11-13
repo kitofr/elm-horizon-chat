@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      * { box-sizing: border-box; }
+      html {
+        font: 100%/1.2 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+      #app {
+        max-width: 35rem;
+        margin: 0 auto;
+      }
+      .message-list {
+        list-style: none;
+        padding-left: 0;
+      }
+      .message {
+        margin-bottom: 0.25rem;
+      }
+      .message > * {
+        vertical-align: middle;
+      }
+      .avatar {
+        width: 50px;
+        height: 50px;
+        margin-right: 0.5rem;
+        border-radius: 27%;
+      }
+      .new-message-field {
+        font-size: 1.25rem;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="//localhost:8181/horizon/horizon.js"></script>
+    <script src="app.js"></script>
+    <script>
+      var horizon = Horizon({ authType: 'anonymous' });
+      horizon.connect();
+      horizon.currentUser().fetch().subscribe(initWithUser, logError);
+
+      function initWithUser (user) {
+        var root = document.querySelector('#app');
+        var app = Elm.Main.embed(root, { userId: user.id });
+        var collection = horizon('elm_chat');
+
+        collection
+          .order('datetime', 'descending')
+          .limit(8)
+          .watch()
+          .subscribe(
+            function (messages) {
+              app.ports.fromHorizon.send(messages);
+            },
+            logError
+          );
+
+        app.ports.updateName.subscribe(function (name) {
+          horizon.currentUser().fetch().subscribe(function (u) {
+            u.data = u.data ? u.data : {};
+            u.data.name = name;
+            horizon('users').replace(u);
+          });
+        });
+
+        app.ports.save.subscribe(function (message) {
+          collection.store({
+            authorId: message.authorId,
+            authorName: message.authorName ? message.authorName : null,
+            datetime: new Date(),
+            message: message.message
+          });
+        });
+      }
+
+      function logError (err) {
+        console.error(err);
+      }
+    </script>
+  </body>
+</html>
